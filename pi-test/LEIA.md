@@ -132,3 +132,14 @@ sudo build/venv/bin/python pi-test/lacunas.py 2>&1 | tee ~/lacunas.txt  # cerca 
 ```
 
 A leitura do resultado está no começo do roteiro.
+
+Resultado (2026-10-22): 3 min em `monotonic` e 3 min em `realtime`, sem o BrainFlow, sem nenhuma
+lacuna. As interrupções do DRDY bateram com as amostras (44984 e 44985), e `lost_samples` ficou
+em 0. O evento não se repetiu. Agora o roteiro tem uma fase pelo BrainFlow. Se as lacunas só
+aparecem com ele, é a carga que ele põe no sistema (uma leitura por amostra) que atrasa a
+interrupção:
+
+```sh
+cd ~/brainflow && git pull
+sudo build/venv/bin/python pi-test/lacunas.py --so-brainflow --seconds 600 2>&1 | tee ~/lacunas-bf.txt
+```

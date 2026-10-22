@@ -10,6 +10,10 @@
 #   sudo build/venv/bin/python pi-test/lacunas.py [--seconds 180] 2>&1 | tee ~/lacunas.txt
 #   build/venv/bin/python pi-test/lacunas.py --autoteste
 #
+# Uma terceira fase faz a mesma medida lendo pelo BrainFlow (--so-brainflow
+# roda so ela). Se as lacunas so aparecem nela, e a carga que o BrainFlow poe
+# no sistema que atrasa a interrupcao do DRDY.
+#
 # Para cada fase:
 #   amostras    - entregues pelo buffer
 #   faltam      - pelos timestamps: soma de (passo / 4 ms arredondado - 1) nos
@@ -137,10 +141,36 @@ def phase(dev, n, clock, seconds, chardev):
     irq = irq_count() - irq0
     lost = dev.read('lost_samples')
 
-    ts = decode(bytes(data), n)
+    report('%s, %d s' % (clock, seconds), decode(bytes(data), n), irq, lost)
+
+
+def phase_brainflow(dev, seconds, chardev):
+    """A mesma medida, lendo pela placa ADS1299_IIO_BOARD (relogio realtime, watermark 1)."""
+    from brainflow.board_shim import BoardShim, BrainFlowInputParams, BoardIds
+    params = BrainFlowInputParams()
+    params.serial_port = dev.dir
+    params.file = chardev
+    board = BoardShim(BoardIds.ADS1299_IIO_BOARD, params)
+    ts_row = BoardShim.get_board_descr(BoardIds.ADS1299_IIO_BOARD)['timestamp_channel']
+    board.prepare_session()
+    try:
+        irq0 = irq_count()
+        board.start_stream()
+        time.sleep(seconds)
+        board.stop_stream()
+        irq = irq_count() - irq0
+        data = board.get_board_data()
+    finally:
+        board.release_session()
+    lost = dev.read('lost_samples')
+    ts = [int(round(x * 1e9)) for x in data[ts_row]]
+    report('brainflow (realtime), %d s' % seconds, ts, irq, lost)
+
+
+def report(label, ts, irq, lost):
     steps = [b - a for a, b in zip(ts, ts[1:])]
     gaps = [(i, s) for i, s in enumerate(steps) if s > GAP_NS]
-    print('\n== %s, %d s' % (clock, seconds))
+    print('\n== %s' % label)
     print('  amostras %d, irq %d, lost_samples %s, faltam pelos timestamps %d'
           % (len(ts), irq, lost, missing_from_steps(steps)))
     print('  passo: menor %.3f ms, maior %.3f ms, fora de ordem %d'
@@ -156,6 +186,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--autoteste', action='store_true')
     parser.add_argument('--seconds', type=int, default=180)
+    parser.add_argument('--so-brainflow', action='store_true', help='so a fase pelo BrainFlow')
     parser.add_argument('--dev', help='diretorio sysfs (so para ensaio sem a placa)')
     parser.add_argument('--file', default='', help='dispositivo de caracteres (so para ensaio sem a placa)')
     args = parser.parse_args()
@@ -181,8 +212,10 @@ def main():
     print('relogio do sistema:')
     os.system('timedatectl show -p NTP -p NTPSynchronized -p TimeUSec 2>/dev/null | sed "s/^/  /"')
     try:
-        phase(dev, n, 'monotonic', args.seconds, chardev)
-        phase(dev, n, 'realtime', args.seconds, chardev)
+        if not args.so_brainflow:
+            phase(dev, n, 'monotonic', args.seconds, chardev)
+            phase(dev, n, 'realtime', args.seconds, chardev)
+        phase_brainflow(dev, args.seconds, chardev)
     finally:
         dev.restore()
     return 0

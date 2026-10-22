@@ -128,9 +128,14 @@ def main():
             return 0 if n >= RATE else 1
         plt.ion()
         plt.show()
+        visto = time.monotonic()
         while plt.fignum_exists(fig.number):
             desenhar()
             plt.pause(0.2)
+            if time.monotonic() - visto >= 2:
+                visto = time.monotonic()
+                total = board.get_board_data_count()
+                print('%s  %d amostras recebidas ate agora' % (time.strftime('%H:%M:%S'), total), flush=True)
     finally:
         board.stop_stream()
         board.release_session()

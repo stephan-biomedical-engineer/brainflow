@@ -77,3 +77,25 @@ Cada medida é lida pelo BrainFlow, como um programa do usuário leria.
 O roteiro foi rodado aqui no PC, inteiro, contra um dispositivo falso que não simula o gerador, o
 curto nem o lead-off. G e A passaram. As verificações de B a F falharam, como deviam com dados
 falsos, e os atributos voltaram aos valores de antes. Na placa ele nunca rodou.
+
+## Diagnóstico da falha do E (2026-10-22)
+
+Na primeira rodada da F3, só o E falhou, e só no canal 7: o nível do gerador no ganho 1 saiu 3,5 %
+acima do ganho 24. Os outros canais ficaram entre −1,7 % e +1,5 %. A caracterização
+(`BRINGUP_AFE.md` §5.1) mediu o mesmo gerador nos 7 ganhos com leituras avulsas, e a variação
+foi de 0,06 % a 0,72 %. O E usa o buffer contínuo. O `ganho1.py` mede o gerador dos três jeitos,
+intercalados, nos ganhos 1 e 24, em três rodadas:
+
+```sh
+cd ~/brainflow
+git pull                                          # traz o ganho1.py
+build/venv/bin/python pi-test/ganho1.py --autoteste      # esperado: tudo certo
+sudo build/venv/bin/python pi-test/ganho1.py 2>&1 | tee ~/ganho1.txt   # cerca de 1,5 minuto
+```
+
+- Se o `brainflow` e o `buffer` (lido em Python, sem o BrainFlow) baterem a 0,1 ponto, a placa
+  está certa. Esse é o critério do roteiro.
+- Se os dois discordarem da `avulsa` no ganho 1, a diferença é do modo de aquisição (driver ou
+  chip), e vira uma questão do driver.
+
+O offset em códigos aparece ao lado, para ver se é ele que se move entre uma medida e outra.

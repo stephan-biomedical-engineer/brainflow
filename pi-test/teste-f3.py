@@ -21,8 +21,10 @@
 #      ponto do que a F4 mediu nesta Pi sem o BrainFlow
 #   C. entradas em curto: ruido pico a pico, em codigos, abaixo do teto do
 #      autoteste (447 = 10 uV no ganho 24)
-#   D. lead-off com a entrada positiva de todo canal sentida e as entradas
-#      abertas: a linha de lead-off igual ao lead_off_status; sem nada
+#   D. lead-off com a entrada positiva de todo canal sentida, as entradas
+#      abertas e a corrente de 6 uA (com a corrente padrao, uma entrada aberta
+#      perto do limiar faz o comparador oscilar: 2026-10-22, canal 3): a linha
+#      de lead-off com um valor so, igual ao lead_off_status; sem nada
 #      sentido, a linha em 0
 #   E. ganho 1 em vez de 24 pelo config_board: o erro do gerador em uV a 0,1
 #      ponto do que leituras avulsas (in_voltageN_raw x scale, sem o BrainFlow)
@@ -274,14 +276,20 @@ class Test:
         print('\n== D. lead-off, entradas abertas')
         self.set_all('in_voltage%d_input_mux', 'normal')
         self.config('lead_off_frequency', 'dc')
+        self.dev.save('lead_off_current_nanoamp')
+        print('  corrente de lead-off: %s nA, passa a 6000' % self.dev.read('lead_off_current_nanoamp'))
+        self.config('lead_off_current_nanoamp', '6000')
         self.set_all('in_voltage%d_lead_off_sense_p', '1')
         data = self.stream(2)
         status = self.dev.read('lead_off_status')
         words = [int(x) for x in data[self.lo][DISCARD:]]
-        print('  lead_off_status "%s"; linha de lead-off: moda 0x%04x, %d valores distintos'
-              % (status, mode(words), len(set(words))))
-        self.check(status not in ('disabled', 'ac') and mode(words) == lead_off_word(status),
-                   'a linha de lead-off e o lead_off_status')
+        common = sorted(set(words), key=words.count, reverse=True)
+        counts = ', '.join('0x%04x x%d' % (w, words.count(w)) for w in common[:8])
+        if len(common) > 8:
+            counts += ' e mais %d valores' % (len(common) - 8)
+        print('  lead_off_status "%s"; linha de lead-off: %s' % (status, counts))
+        self.check(status not in ('disabled', 'ac') and set(words) == {lead_off_word(status)},
+                   'a linha de lead-off tem um valor so, o do lead_off_status')
         self.check((mode(words) >> 8) != 0, 'alguma entrada positiva aberta aparece')
 
         self.set_all('in_voltage%d_lead_off_sense_p', '0')

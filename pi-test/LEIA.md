@@ -101,3 +101,13 @@ sudo build/venv/bin/python pi-test/ganho1.py 2>&1 | tee ~/ganho1.txt   # cerca d
   chip), e vira uma questão do driver.
 
 O offset em códigos aparece ao lado, para ver se é ele que se move entre uma medida e outra.
+
+## D na segunda rodada (2026-10-22)
+
+Na rodada sobre `b4eda311`, só o D falhou. O `lead_off_status` era `ff 00`, mas a linha de
+lead-off teve 3 valores distintos, com moda `0xfb00`: o canal 3 aparecia conectado na maior parte
+do tempo. Na primeira rodada, a linha tinha sido `0xff00` do começo ao fim. Uma entrada aberta,
+com a corrente padrão de lead-off, fica perto do limiar, e o comparador oscila. O D agora usa
+6 µA, que levam a entrada aberta firme ao trilho. Sem nada ligado no DB25, isso é inofensivo. O
+critério também ficou mais estrito: um valor só, igual ao `lead_off_status`. A contagem de cada
+valor aparece na saída.

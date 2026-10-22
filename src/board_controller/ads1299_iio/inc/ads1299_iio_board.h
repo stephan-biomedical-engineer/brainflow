@@ -38,6 +38,13 @@ protected:
     int timestamp_element;
     std::vector<double> uv_per_code;
 
+    // rows of the package, from the board descriptor
+    int num_rows;
+    int package_num_row;
+    int timestamp_row;
+    int lead_off_row;
+    std::vector<int> eeg_rows;
+
     int find_device ();
     int discover_scan_elements ();
     int setup_scan ();

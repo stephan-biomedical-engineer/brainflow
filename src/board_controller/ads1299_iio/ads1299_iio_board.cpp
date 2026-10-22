@@ -14,6 +14,7 @@
 #include <chrono>
 #include <locale>
 #include <sstream>
+#include <system_error>
 
 #include "timestamp.h"
 
@@ -100,6 +101,22 @@ static bool all_digits (const std::string &s)
         std::all_of (s.begin (), s.end (), [] (char c) { return c >= '0' && c <= '9'; });
 }
 
+// a scan index or channel number: digits only, no exceptions
+static bool parse_index (const std::string &s, int *value)
+{
+    if (!all_digits (s) || s.size () > 9)
+    {
+        return false;
+    }
+    int v = 0;
+    for (char c : s)
+    {
+        v = v * 10 + (c - '0');
+    }
+    *value = v;
+    return true;
+}
+
 static std::string basename_of (const std::string &path)
 {
     std::string p = path;
@@ -121,6 +138,10 @@ ADS1299IIOBoard::ADS1299IIOBoard (int board_id, struct BrainFlowInputParams para
     scan_size = 0;
     lead_off_element = -1;
     timestamp_element = -1;
+    num_rows = 0;
+    package_num_row = 0;
+    timestamp_row = 0;
+    lead_off_row = 0;
 }
 
 ADS1299IIOBoard::~ADS1299IIOBoard ()
@@ -183,6 +204,7 @@ int ADS1299IIOBoard::discover_scan_elements ()
             continue;
         }
         std::string base = file.substr (0, file.size () - suffix.size ());
+        int channel = 0;
         std::string rest =
             (base.compare (0, prefix.size (), prefix) == 0) ? base.substr (prefix.size ()) : "";
 
@@ -190,9 +212,9 @@ int ADS1299IIOBoard::discover_scan_elements ()
         {
             timestamp_name = base;
         }
-        else if (all_digits (rest))
+        else if (parse_index (rest, &channel))
         {
-            voltages.push_back (std::make_pair (std::stoi (rest), base));
+            voltages.push_back (std::make_pair (channel, base));
         }
         else if (rest.size () > 9 && rest.compare (rest.size () - 9, 9, "_lead_off") == 0 &&
             all_digits (rest.substr (0, rest.size () - 9)))
@@ -206,7 +228,6 @@ int ADS1299IIOBoard::discover_scan_elements ()
     }
     std::sort (voltages.begin (), voltages.end ());
 
-    std::vector<int> eeg_rows = board_descr["default"]["eeg_channels"];
     for (size_t i = 0; i < voltages.size (); i++)
     {
         if (i < eeg_rows.size ())
@@ -252,6 +273,22 @@ int ADS1299IIOBoard::prepare_session ()
     {
         safe_logger (spdlog::level::info, "Session already prepared");
         return (int)BrainFlowExitCodes::STATUS_OK;
+    }
+
+    // the reading thread must not throw, so the rows are read here, once
+    try
+    {
+        const json &d = board_descr.at ("default");
+        num_rows = d.at ("num_rows").get<int> ();
+        package_num_row = d.at ("package_num_channel").get<int> ();
+        timestamp_row = d.at ("timestamp_channel").get<int> ();
+        lead_off_row = d.at ("other_channels").at (0).get<int> ();
+        eeg_rows = d.at ("eeg_channels").get<std::vector<int>> ();
+    }
+    catch (json::exception &e)
+    {
+        safe_logger (spdlog::level::err, "board descriptor: {}", e.what ());
+        return (int)BrainFlowExitCodes::NO_SUCH_DATA_IN_JSON_ERROR;
     }
 
     int res = find_device ();
@@ -341,7 +378,12 @@ int ADS1299IIOBoard::setup_scan ()
     std::string se = dev_dir + "/scan_elements/";
     for (const auto &base : unused_names)
     {
-        write_attr (se + base + "_en", "0");
+        int err = write_attr (se + base + "_en", "0");
+        if (err != 0)
+        {
+            // only costs bandwidth: the layout comes from what is enabled
+            safe_logger (spdlog::level::warn, "failed to disable {}: {}", base, strerror (err));
+        }
     }
     for (const auto &base : used)
     {
@@ -354,14 +396,13 @@ int ADS1299IIOBoard::setup_scan ()
             safe_logger (spdlog::level::err, "failed to enable {}: {}", base, strerror (err));
             return (int)BrainFlowExitCodes::BOARD_WRITE_ERROR;
         }
-        if (!read_attr (se + base + "_index", index) || !all_digits (index) ||
+        if (!read_attr (se + base + "_index", index) || !parse_index (index, &e.index) ||
             !read_attr (se + base + "_type", type) || !parse_iio_scan_type (type, &e.type))
         {
             safe_logger (spdlog::level::err, "unreadable index or type for {}", base);
             return (int)BrainFlowExitCodes::BOARD_NOT_READY_ERROR;
         }
         e.name = base;
-        e.index = std::stoi (index);
         e.offset = 0;
         elements.push_back (e);
     }
@@ -462,7 +503,19 @@ int ADS1299IIOBoard::start_stream (int buffer_size, const char *streamer_params)
     }
 
     keep_alive = true;
-    streaming_thread = std::thread ([this] { this->read_thread (); });
+    try
+    {
+        streaming_thread = std::thread ([this] { this->read_thread (); });
+    }
+    catch (const std::system_error &e)
+    {
+        safe_logger (spdlog::level::err, "failed to start the reading thread: {}", e.what ());
+        keep_alive = false;
+        close (fd);
+        fd = -1;
+        set_buffer_enable (false);
+        return (int)BrainFlowExitCodes::STREAM_THREAD_ERROR;
+    }
     return (int)BrainFlowExitCodes::STATUS_OK;
 }
 
@@ -557,11 +610,6 @@ int ADS1299IIOBoard::config_board (std::string config, std::string &response)
 
 void ADS1299IIOBoard::read_thread ()
 {
-    int num_rows = board_descr["default"]["num_rows"];
-    int package_num_row = board_descr["default"]["package_num_channel"];
-    int timestamp_row = board_descr["default"]["timestamp_channel"];
-    std::vector<int> eeg_rows = board_descr["default"]["eeg_channels"];
-    std::vector<int> other_rows = board_descr["default"]["other_channels"];
     std::vector<double> package (num_rows, 0.0);
     std::vector<uint8_t> buf (scan_size * 64);
     size_t fill = 0;
@@ -631,7 +679,7 @@ void ADS1299IIOBoard::read_thread ()
                 const IioScanElement &e = elements[voltage_elements[i]];
                 package[eeg_rows[i]] = (double)decode_iio_element (scan, e) * uv_per_code[i];
             }
-            package[other_rows[0]] = (lead_off_element >= 0) ?
+            package[lead_off_row] = (lead_off_element >= 0) ?
                 (double)decode_iio_element (scan, elements[lead_off_element]) :
                 -1.0;
             if (timestamp_element >= 0)

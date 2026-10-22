@@ -53,6 +53,8 @@ def main():
     parser.add_argument('--endereco', default='225.1.1.1')
     parser.add_argument('--porta', type=int, default=6677)
     parser.add_argument('--arquivo', help='rever uma sessao gravada, em vez de receber da Pi')
+    parser.add_argument('--bruto', action='store_true', help='so tira a media, sem filtros (para o gerador)')
+    parser.add_argument('--escala', type=float, default=100.0, help='uV entre canais')
     parser.add_argument('--png', help='sem tela: grava uma figura e sai')
     parser.add_argument('--segundos', type=float, default=10.0, help='com --png, quanto esperar')
     args = parser.parse_args()
@@ -98,9 +100,9 @@ def main():
             ax.set_title('esperando dados de %s (%d amostras)' % (origem, n))
             return n
         t = [i / RATE for i in range(n)]
-        passo = 100.0
+        passo = args.escala
         for i, row in enumerate(eeg):
-            y = filtrar(data[row])
+            y = data[row] - data[row].mean() if args.bruto else filtrar(data[row])
             ax.plot(t, y - i * passo, linewidth=0.7)
             ax.text(t[-1] + 0.05, -i * passo, '%s  alfa %.0f %%' % (nomes[i], 100 * alfa_relativa(y)),
                     va='center', fontsize=9)
@@ -111,7 +113,8 @@ def main():
                 ax.text(t[i], passo * 0.6, '%g' % m, fontsize=8)
         ax.set_yticks([-i * passo for i in range(len(eeg))])
         ax.set_yticklabels(nomes)
-        ax.set_xlabel('s (ultimos %.0f s); escala: 100 uV entre canais' % args.janela)
+        ax.set_xlabel('s (ultimos %.0f s); %.0f uV entre canais%s'
+                      % (args.janela, passo, '; sem filtro' if args.bruto else '; 1-40 Hz, sem 60 Hz'))
         ax.set_xlim(0, args.janela + 1.2)
         ax.set_title('ADS1299_IIO_BOARD, de %s' % origem)
         return n

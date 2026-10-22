@@ -238,3 +238,29 @@ Ensaio no PC (2026-10-22), com o dispositivo falso e durações divididas por 10
 rodou até o fim, gravou os 17 marcadores na ordem e devolveu os atributos. O visualizador
 desenhou uma sessão sintética pela `PLAYBACK_FILE_BOARD`. O transporte por multicast não pôde
 ser visto aqui. Nada disso rodou numa pessoa.
+
+## Formas de onda sem eletrodos (2026-10-22)
+
+O multicast não chegava ao PC porque o `ufw` estava ativo e bloqueava a porta 6677. Com
+`sudo ufw allow 6677/udp`, o exemplo da placa sintética do BrainFlow passou a receber (999
+amostras em 4 s). A demo também foi vista, aqui no PC, contra o dispositivo falso: a janela de 5 s
+cheia logo depois da troca de sinal.
+
+O `demo_sinais.py` mostra o gerador interno do ADS1299 pelo mesmo caminho de uma sessão: placa,
+streaming pelo Wi-Fi e gráfico no PC. Ele não vai numa pessoa, então a Pi pode estar na fonte.
+
+- CH1 a CH6: o gerador, alternando a cada 20 s entre `1x_slow` (~1 Hz, 3,75 mV pico a pico) e
+  `2x_fast` (~2 Hz, 7,5 mV).
+- CH7 e CH8: entradas em curto, o piso de ruído.
+
+```sh
+# no PC, primeiro
+cd ~/Documents/TCC/brainflow
+build/venv/bin/python pi-test/ao_vivo_pc.py --bruto --escala 5000
+# na Pi
+cd ~/brainflow && git pull
+sudo build/venv/bin/python pi-test/demo_sinais.py --segundos 120
+```
+
+O `--bruto` só tira a média, para a quadrada aparecer quadrada. Sem ele, o passa-banda de 1 a
+40 Hz a transforma em pulsos nas bordas.

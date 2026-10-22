@@ -143,3 +143,98 @@ interrupção:
 cd ~/brainflow && git pull
 sudo build/venv/bin/python pi-test/lacunas.py --so-brainflow --seconds 600 2>&1 | tee ~/lacunas-bf.txt
 ```
+
+# Usar o BrainFlow numa pessoa, como na PiEEG
+
+Até aqui, a placa foi validada contra leituras sem o BrainFlow. Esta parte usa o framework como
+um usuário da PiEEG usaria. Uma touca de 8 canais, referência no SRB1 e BIAS vão numa pessoa. O
+EEG aparece ao vivo no PC e é gravado com marcadores. A análise usa só o `DataFilter` do
+BrainFlow. Dois sinais fisiológicos mostram que a cadeia inteira extrai EEG:
+
+- **Efeito Berger:** o alfa (8 a 13 Hz) nos eletrodos occipitais cresce com os olhos fechados.
+- **Piscadas:** picos de 100 a 400 µV nos eletrodos da testa.
+
+## Segurança
+
+A placa não é um equipamento médico e não tem isolação. Com os eletrodos na pessoa, a Pi fica
+**só na bateria** (power bank), sem nenhum cabo para algo ligado na tomada: nem fonte, nem HDMI,
+nem USB para o PC. A ligação com o PC é só pelo Wi-Fi. O PC pode ficar na tomada. É o mesmo
+aviso da PiEEG. O `sessao.py` pergunta isso antes de começar.
+
+## Montagem
+
+- A touca nas posições do `--nomes`, na ordem CH1 a CH8. O padrão é o da PiEEG:
+  `Fp1,Fp2,C3,C4,P7,P8,O1,O2`. A análise procura os canais occipitais pelo nome (começa com `O`)
+  e os da testa também (começa com `Fp`).
+- A chave SRB1 na posição do eletrodo de referência (um lóbulo da orelha), não em GNDA.
+- O eletrodo de BIAS no outro lóbulo.
+
+O `sessao.py` configura o resto pelo `config_board`:
+- `montage referential` (o SRB1 nas entradas negativas);
+- `bias_drive on`, com o BIAS derivado das entradas P e N dos 8 canais, como no padrão da OpenBCI;
+- ganho 24, MUX normal e gerador desligado.
+
+No fim, ele devolve tudo como estava.
+
+## No PC (este, onde o BrainFlow do fork está compilado)
+
+O PC precisa receber o multicast UDP de 225.1.1.1:6677. **Neste PC, o multicast não chegou nem
+de si para si mesmo** (2026-10-22). Nem o exemplo da placa sintética do BrainFlow funcionou. O
+suspeito é o firewall:
+
+```sh
+sudo ufw status                     # se "active":
+sudo ufw allow 6677/udp
+```
+
+Depois, com a Pi ligada e o Wi-Fi em comum:
+
+```sh
+cd ~/Documents/TCC/brainflow        # ramo ads1299-iio-pi-test
+build/venv/bin/python pi-test/ao_vivo_pc.py
+```
+
+A janela fica esperando até a Pi começar a gravar. Se nada chegar, a rede pode estar isolando
+os clientes. Nesse caso, grave assim mesmo, e depois reveja a sessão gravada com
+`ao_vivo_pc.py --arquivo sessao-....csv`.
+
+## Na Pi
+
+```sh
+cd ~/brainflow && git pull
+sudo build/venv/bin/python pi-test/sessao.py 2>&1 | tee ~/sessao.txt
+```
+
+O `sessao.py` faz quatro coisas, em ordem:
+
+1. **Contato:** lead-off DC de 6 nA por 3 s, um eletrodo por linha, mais REF e BIAS. Os que
+   saírem `solto` ou `instavel` precisam de ajuste (gel, cabelo afastado); rode de novo.
+2. **Qualidade:** 5 s, com o RMS em 1 a 40 Hz e o 60 Hz de cada canal.
+3. **Gravação** (cerca de 4 min), depois da confirmação:
+   - 3 ciclos de 30 s de olhos abertos e 30 s de olhos fechados. Um bipe no terminal do PC (pelo
+     ssh) avisa a hora de abrir;
+   - depois, 10 piscadas firmes, uma a cada bipe.
+4. **No fim,** mostra o comando para copiar o arquivo.
+
+## Análise, no PC
+
+```sh
+scp stephan@stephan-rpi:~/brainflow/sessao-AAAAMMDD-HHMM.csv .
+build/venv/bin/python pi-test/analise.py sessao-AAAAMMDD-HHMM.csv
+```
+
+A análise faz o seguinte, tudo com o `DataFilter`:
+- filtros: média tirada, 60 Hz removido e passa-banda de 1 a 40 Hz;
+- PSD de Welch por condição;
+- razão de alfa entre olhos fechados e abertos, por canal;
+- potência relativa por banda (`get_avg_band_powers`);
+- piscadas detectadas nas deixas.
+
+Ela grava `-psd.png` e `-piscadas.png` ao lado do arquivo. Os critérios estão no começo do
+roteiro. O `--autoteste` gera duas sessões sintéticas, uma com alfa e piscadas e outra sem, e
+confere que a primeira passa e a segunda falha.
+
+Ensaio no PC (2026-10-22), com o dispositivo falso e durações divididas por 10: o `sessao.py`
+rodou até o fim, gravou os 17 marcadores na ordem e devolveu os atributos. O visualizador
+desenhou uma sessão sintética pela `PLAYBACK_FILE_BOARD`. O transporte por multicast não pôde
+ser visto aqui. Nada disso rodou numa pessoa.

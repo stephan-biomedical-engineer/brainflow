@@ -24,8 +24,11 @@
 #   D. lead-off com a entrada positiva de todo canal sentida e as entradas
 #      abertas: a linha de lead-off igual ao lead_off_status; sem nada
 #      sentido, a linha em 0
-#   E. ganho 1 em vez de 24 pelo config_board: o nivel do gerador em uV muda
-#      menos de 2 %, o codigo bruto cai cerca de 24 vezes
+#   E. ganho 1 em vez de 24 pelo config_board: o erro do gerador em uV a 0,1
+#      ponto do que leituras avulsas (in_voltageN_raw x scale, sem o BrainFlow)
+#      dao no mesmo ganho. O nivel NAO e o mesmo nos dois ganhos: neste chip o
+#      ganho 1 se afasta do 24 de -1,7 a +3,5 % conforme o canal (ganho1.py,
+#      2026-10-22), igual nos tres metodos de leitura
 #   F. onda quadrada 1x_slow: periodo de 256 amostras (fCLK / 2^21 contra
 #      fCLK / 8192), independente do relogio
 #   G. config_board: recusa sampling_frequency e escrita durante o stream;
@@ -226,19 +229,29 @@ class Test:
         self.set_all('in_voltage%d_input_mux', 'test_signal')
         level1 = self.means(self.stream(2))
         scale1 = [self.uv_per_code(ch) for ch in range(self.n)]
+        direct_level = self.direct()
         self.set_all('in_voltage%d_input_mux', 'shorted')
         offset1 = self.means(self.stream(2))
+        direct_offset = self.direct()
         for ch in range(self.n):
-            amp24 = abs(level[ch] - offset[ch])
-            amp1 = abs(level1[ch] - offset1[ch])
-            codes24 = amp24 / scale24[ch]
-            codes1 = amp1 / scale1[ch]
-            diff = (amp1 / amp24 - 1) * 100
-            print('  canal %d: %.2f uV no ganho 1, %.2f uV no 24 (%+.2f %%); codigos %.0f contra %.0f'
-                  % (ch + 1, amp1, amp24, diff, codes1, codes24))
-            self.check(abs(diff) < 2, 'canal %d: o nivel em uV muda menos de 2 %%' % (ch + 1))
-            self.check(abs(codes24 / codes1 - 24) < 24 * 0.02, 'canal %d: os codigos caem 24 vezes' % (ch + 1))
+            err1 = gen_err(level1[ch], offset1[ch])
+            err_direct = gen_err(direct_level[ch] * scale1[ch], direct_offset[ch] * scale1[ch])
+            err24 = gen_err(level[ch], offset[ch])
+            print('  canal %d: erro %+.3f %% pelo BrainFlow, %+.3f %% pelas avulsas (ganho 24: %+.3f %%)'
+                  % (ch + 1, err1, err_direct, err24))
+            self.check(abs(err1 - err_direct) <= 0.1, 'canal %d: a 0,1 ponto das avulsas' % (ch + 1))
         self.set_all('in_voltage%d_hardwaregain', '24')
+
+    def direct(self):
+        """Media de 10 leituras avulsas por canal, depois de 2 descartadas, 50 ms entre elas."""
+        vals = [[] for _ in range(self.n)]
+        for r in range(12):
+            row = [int(self.dev.read('in_voltage%d_raw' % ch)) for ch in range(self.n)]
+            if r >= 2:
+                for ch in range(self.n):
+                    vals[ch].append(row[ch])
+            time.sleep(0.050)
+        return [statistics.mean(v) for v in vals]
 
     # F
     def square(self):

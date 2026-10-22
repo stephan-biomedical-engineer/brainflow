@@ -65,9 +65,11 @@ Cada medida é lida pelo BrainFlow, como um programa do usuário leria.
   a F4 mediu nesta Pi com leituras diretas, de −0,076 % a −0,414 %.
 - **C.** O ruído com as entradas em curto, convertido de volta em códigos, fica abaixo do teto do
   autoteste: 447 códigos, 10 µV no ganho 24.
-- **E.** O mesmo gerador no ganho 1, trocado pelo `config_board`. O nível em µV muda menos de 2 %,
-  e o código bruto cai cerca de 24 vezes. Isso mostra que a placa relê o `scale` a cada stream.
-  Se não relesse, o nível em µV cairia 24 vezes.
+- **E.** O mesmo gerador no ganho 1, trocado pelo `config_board`. O erro em µV tem de ficar a
+  0,1 ponto do que dão as leituras avulsas (`in_voltageN_raw` × `scale`) no mesmo ganho. Isso
+  mostra que a placa relê o `scale` a cada stream: se não relesse, o erro seria de 24 vezes. O
+  nível não é o mesmo nos dois ganhos. Neste chip, o ganho 1 se afasta do 24 de −1,7 % a +3,5 %
+  conforme o canal (ver o diagnóstico abaixo).
 - **F.** A onda quadrada `1x_slow` tem período de 256 amostras: fCLK/2²¹ contra fCLK/8192, a mesma
   razão para qualquer relógio. Uma amostra perdida ou repetida muda o período.
 - **D.** A entrada positiva de todo canal é sentida, com as entradas abertas. A linha de lead-off

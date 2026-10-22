@@ -97,9 +97,10 @@ enum class BoardIds : int
     NEUROPAWN_KNIGHT_BOARD_IMU = 66,
     MUSE_S_ATHENA_BOARD = 67,
     SHIMMER3_BOARD = 68,
+    ADS1299_IIO_BOARD = 69,
     // use it to iterate
     FIRST = PLAYBACK_FILE_BOARD,
-    LAST = SHIMMER3_BOARD
+    LAST = ADS1299_IIO_BOARD
 };
 
 enum class IpProtocolTypes : int

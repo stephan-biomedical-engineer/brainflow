@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "aavaa_v3.h"
+#include "ads1299_iio_board.h"
 #include "ant_neuro.h"
 #include "biolistener.h"
 #include "board.h"
@@ -285,6 +286,9 @@ int prepare_session (int board_id, const char *json_brainflow_input_params)
             break;
         case BoardIds::PIEEG_BOARD:
             board = std::shared_ptr<Board> (new PIEEGBoard (board_id, params));
+            break;
+        case BoardIds::ADS1299_IIO_BOARD:
+            board = std::shared_ptr<Board> (new ADS1299IIOBoard (board_id, params));
             break;
         case BoardIds::SYNCHRONI_TRIO_3_CHANNELS_BOARD:
             board = std::shared_ptr<Board> (new SynchroniBoard (board_id, params));

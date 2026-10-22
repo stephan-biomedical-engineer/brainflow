@@ -86,7 +86,8 @@ BrainFlowBoards::BrainFlowBoards()
             {"65", json::object()},
             {"66", json::object()},
             {"67", json::object()},
-            {"68", json::object()}
+            {"68", json::object()},
+            {"69", json::object()}
         }
     }};
 
@@ -1216,6 +1217,19 @@ BrainFlowBoards::BrainFlowBoards()
         {"temperature_channels", {15}},
         {"battery_channel", 16},
         {"other_channels", {17}}
+    };
+    // TI ADS1299 through its Linux IIO driver; the other row is the lead-off word, -1 when the
+    // driver does not buffer it
+    brainflow_boards_json["boards"]["69"]["default"] =
+    {
+        {"name", "ADS1299-IIO"},
+        {"sampling_rate", 250},
+        {"package_num_channel", 0},
+        {"timestamp_channel", 10},
+        {"marker_channel", 11},
+        {"num_rows", 12},
+        {"eeg_channels", {1, 2, 3, 4, 5, 6, 7, 8}},
+        {"other_channels", {9}}
     };
 }
 

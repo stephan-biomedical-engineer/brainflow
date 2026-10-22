@@ -83,6 +83,8 @@ SET (BOARD_CONTROLLER_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ntl/ntl_wifi.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/aavaa/aavaa_v3.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/pieeg/pieeg_board.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ads1299_iio/ads1299_iio_board.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ads1299_iio/iio_scan.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/synchroni/synchroni_board.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/neuropawn/knight.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/neuropawn/knight_base.cpp
@@ -154,6 +156,7 @@ target_include_directories (
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ntl/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/aavaa/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/pieeg/inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ads1299_iio/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/synchroni/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/neuropawn/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/biolistener/inc

@@ -42,6 +42,7 @@ final class BrainFlowTests: XCTestCase {
     func testBoardIdsMatchNativeConstants() {
         XCTAssertEqual(BoardIds.SYNCHRONI_NEO_8_CHANNELS_BOARD.rawValue, 61)
         XCTAssertEqual(BoardIds.SHIMMER3_BOARD.rawValue, 68)
+        XCTAssertEqual(BoardIds.ADS1299_IIO_BOARD.rawValue, 69)
     }
 
     func testBoardShimRejectsInvalidArgumentsBeforeNativeCalls() throws {

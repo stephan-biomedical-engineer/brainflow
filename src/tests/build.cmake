@@ -33,6 +33,8 @@ SET (TESTS_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/utils/bluetooth/socket_bluetooth_test.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/utils/bluetooth/bluetooth_functions_unittest.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/utils/data_buffer_unittest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ads1299_iio/iio_scan.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/utils/iio_scan_unittest.cpp
 )
 
 add_executable(
@@ -46,6 +48,7 @@ target_include_directories (
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/bluetooth/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tests/utils/bluetooth/inc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/bluetooth/macos_third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/board_controller/ads1299_iio/inc
 )
 
 target_link_libraries(

@@ -1580,3 +1580,68 @@ Common sensor bits:
 - :code:`0x000008`, EXG2 24-bit
 - :code:`0x000004`, GSR, exposed as EDA
 - :code:`0x002000`, battery
+
+Texas Instruments
+------------------
+
+ADS1299 through Linux IIO
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+`ti-ads1299 driver <https://github.com/stephan-biomedical-engineer/ads1299-linux>`_
+
+A TI ADS1299 (or ADS1299-6, ADS1299-4) wired to a Linux machine's SPI bus and driven by its kernel
+driver, which exposes it as an Industrial I/O (IIO) device. The driver owns the chip: BrainFlow
+enables the IIO buffer, reads :code:`/dev/iio:deviceN` and converts each sample to microvolts
+with the channel's :code:`scale`.
+
+The board uses the generic IIO interface only, so it reads both the out-of-tree :code:`ti-ads1299`
+driver linked above and mainline's :code:`ti-ads1298`. With :code:`ti-ads1299`, each sample carries
+the driver's timestamp and the lead-off state. With :code:`ti-ads1298`, which buffers neither, the
+timestamp comes from the host clock at read time and the lead-off row is -1.
+
+To create such board you need to specify the following board ID and fields of BrainFlowInputParams
+object:
+
+- :code:`BoardIds.ADS1299_IIO_BOARD`
+- *optional:* :code:`serial_port`, the device's sysfs directory, e.g.
+  /sys/bus/iio/devices/iio:device0. If empty, BrainFlow uses the only IIO device whose name
+  starts with "ads129"
+- *optional:* :code:`file`, the device's character device. If empty, /dev/ followed by the name
+  of the sysfs directory, e.g. /dev/iio:device0
+
+Initialization Example:
+
+.. code-block:: python
+
+    params = BrainFlowInputParams()
+    board = BoardShim(BoardIds.ADS1299_IIO_BOARD, params)
+    board.prepare_session()
+    board.start_stream()
+
+The device runs at 250 SPS, as the board descriptor says; :code:`prepare_session` sets it.
+Device attributes can be read and written with :code:`config_board` while the stream is stopped:
+
+- Read an attribute: :code:`board.config_board("in_voltage0_hardwaregain")`
+- Write an attribute: :code:`board.config_board("in_voltage0_hardwaregain=24")`
+
+The attribute names are those of the driver, under /sys/bus/iio/devices/iio:deviceN.
+:code:`sampling_frequency` cannot be changed.
+
+**Enabling the IIO buffer writes to sysfs, which needs root by default. Run with sudo, or give
+your user write access to the device's attributes and read access to its character device with
+a udev rule.**
+
+Supported platforms:
+
+- Linux, with the device's kernel driver loaded
+- Devices like Raspberry Pi
+
+Tested on a Raspberry Pi 4B with Raspberry Pi OS (Linux 6.18) and the :code:`ti-ads1299` driver.
+:code:`ti-ads1298` was tested with the emulator in :code:`emulator/brainflow_emulator`, not with
+hardware.
+
+Available :ref:`presets-label`:
+
+- :code:`BrainFlowPresets.DEFAULT_PRESET`, it contains EEG data (8 rows; with fewer channels the
+  extra rows stay at 0), the lead-off state as one other channel (:code:`(positive << 8) | negative`,
+  bit n set when channel n + 1's input is off), timestamp and marker

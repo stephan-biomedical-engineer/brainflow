@@ -326,6 +326,12 @@ jobs:
       run: sudo -H python3 $GITHUB_WORKSPACE/emulator/brainflow_emulator/cyton_linux.py python3 $GITHUB_WORKSPACE/python_package/examples/tests/brainflow_get_data.py --board-id 2 --serial-port
     - name: KnightBoard Python
       run: sudo -H python3 $GITHUB_WORKSPACE/emulator/brainflow_emulator/knightboard_linux.py python3 $GITHUB_WORKSPACE/python_package/examples/tests/brainflow_get_data.py --board-id 57 --serial-port 
+    - name: ADS1299 IIO Python
+      if: (matrix.os == 'ubuntu-latest')
+      run: sudo -H python3 $GITHUB_WORKSPACE/emulator/brainflow_emulator/ads1299_iio_emulator.py --mode ads1299
+    - name: ADS1299 IIO Python, mainline ti-ads1298 layout
+      if: (matrix.os == 'ubuntu-latest')
+      run: sudo -H python3 $GITHUB_WORKSPACE/emulator/brainflow_emulator/ads1299_iio_emulator.py --mode ads1298 --channels 4
     - name: Cyton Daisy Python Markers
       run: sudo -H python3 $GITHUB_WORKSPACE/emulator/brainflow_emulator/cyton_linux.py python3 $GITHUB_WORKSPACE/python_package/examples/tests/markers.py --board-id 2 --serial-port 
     - name: Galea Cpp

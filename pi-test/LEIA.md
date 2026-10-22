@@ -111,3 +111,24 @@ com a corrente padrão de lead-off, fica perto do limiar, e o comparador oscila.
 6 µA, que levam a entrada aberta firme ao trilho. Sem nada ligado no DB25, isso é inofensivo. O
 critério também ficou mais estrito: um valor só, igual ao `lead_off_status`. A contagem de cada
 valor aparece na saída.
+
+## A na terceira rodada (2026-10-22): uma lacuna de 16,1 ms
+
+Na rodada sobre `de9d7d8c`, só o A falhou: um passo de 16,1 ms entre timestamps, com
+`lost_samples` 0 e os números de pacote sem buraco. Os timestamps são do driver, e o BrainFlow só
+os decodifica. Há duas explicações possíveis:
+
+- O driver perdeu ~3 conversões sem contar. Uma interrupção do DRDY atrasada junta as bordas
+  seguintes.
+- O relógio `realtime` foi ajustado no meio da gravação.
+
+O `lacunas.py` lê o buffer sem o BrainFlow, 3 minutos com o relógio `monotonic` e 3 com o
+`realtime`. Ele compara as lacunas com o `lost_samples` e com as interrupções do DRDY:
+
+```sh
+cd ~/brainflow && git pull
+build/venv/bin/python pi-test/lacunas.py --autoteste                 # esperado: tudo certo
+sudo build/venv/bin/python pi-test/lacunas.py 2>&1 | tee ~/lacunas.txt  # cerca de 6 minutos
+```
+
+A leitura do resultado está no começo do roteiro.
